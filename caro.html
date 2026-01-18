@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe - Random Turn Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #020617;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        #board {
+            display: grid;
+            gap: 5px;
+            margin: 0 auto;
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+        }
+
+        .cell {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            background: #0f172a;
+            border-radius: 12px;
+            user-select: none;
+        }
+
+        .cell:hover {
+            background: #334155;
+            transform: scale(0.98);
+        }
+
+        .cell.x { color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.6); }
+        .cell.o { color: #fb7185; text-shadow: 0 0 20px rgba(251, 113, 133, 0.6); }
+
+        .winning-cell {
+            background: #0ea5e9 !important;
+            color: white !important;
+            animation: winPulse 0.8s infinite alternate;
+        }
+
+        @keyframes winPulse {
+            from { transform: scale(1); filter: brightness(1.2); }
+            to { transform: scale(0.92); filter: brightness(1.5); }
+        }
+
+        .hidden { display: none !important; }
+
+        .animate-pop { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #1e293b;
+            border-radius: 10px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #38bdf8;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 4px solid #020617;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-[100]"></canvas>
+
+    <div class="w-full max-w-md flex flex-col items-center z-10">
+        <!-- Main Menu -->
+        <div id="menu" class="w-full bg-slate-900/90 p-10 rounded-[3rem] border border-slate-800 shadow-2xl backdrop-blur-xl">
+            <div class="text-center mb-10">
+                <span class="px-3 py-1 bg-sky-500/10 text-sky-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-sky-500/20">Version 2.1 - Random Turn</span>
+                <h1 class="text-6xl font-800 tracking-tighter mt-4 italic">CARO<span class="text-sky-500">.AI</span></h1>
+                <p class="text-slate-500 text-xs mt-2">X hay O? Để số phận quyết định.</p>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="flex flex-col gap-4">
+                    <button onclick="startGame(3)" class="py-4 bg-slate-800 hover:bg-slate-700 rounded-2xl font-bold transition-all border border-slate-700">3x3 (Bất bại)</button>
+                    <button onclick="startGame(5)" class="py-4 bg-slate-800 hover:bg-slate-700 rounded-2xl font-bold transition-all border border-slate-700">5x5 (Cực khó)</button>
+                </div>
+
+                <div class="pt-4 border-t border-slate-800">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tùy chỉnh kích thước</span>
+                        <span class="text-xl font-800 text-white"><span id="sliderValue">3</span>×<span id="sliderValue2">3</span></span>
+                    </div>
+                    <input type="range" id="sizeSlider" min="3" max="10" value="3" oninput="updateSlider(this.value)">
+                    <button onclick="handleCustomStart()" class="w-full mt-6 py-4 bg-sky-600 hover:bg-sky-500 rounded-2xl font-800 text-sm tracking-widest transition-all">THÁCH ĐẤU</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game UI -->
+        <div id="gameUI" class="w-full hidden flex flex-col gap-4 animate-pop">
+            <div class="flex justify-between items-center px-6 py-4 bg-slate-900/80 rounded-[2rem] border border-slate-800 shadow-xl">
+                <button onclick="backToMenu()" class="p-2 text-slate-500 hover:text-white transition-colors">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <div class="text-center">
+                     <div id="status" class="font-black text-sky-400 uppercase tracking-widest text-[11px] mb-1">ĐẾN LƯỢT BẠN</div>
+                     <div id="gameInfo" class="text-[10px] text-slate-500 font-bold">GRID: 3x3 | WIN: 3</div>
+                </div>
+                <button onclick="resetGame()" class="p-2 text-slate-500 hover:text-sky-400 transition-colors">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+            </div>
+
+            <div id="boardContainer" class="flex justify-center items-center py-4">
+                <div id="board"></div>
+            </div>
+
+            <div id="thinking" class="text-center py-2 opacity-0 transition-opacity">
+                <span class="inline-flex items-center px-4 py-2 bg-slate-800 rounded-full text-[10px] font-bold text-slate-400 italic">
+                    AI đang tính toán...
+                </span>
+            </div>
+        </div>
+
+        <!-- Modal -->
+        <div id="modal" class="fixed inset-0 bg-black/90 flex items-center justify-center hidden z-[200] backdrop-blur-sm">
+            <div class="bg-slate-900 p-12 rounded-[3rem] text-center border border-slate-800 shadow-2xl animate-pop">
+                <div id="resultIcon" class="text-8xl mb-6">🏆</div>
+                <h2 id="modalText" class="text-4xl font-900 mb-2">THẮNG!</h2>
+                <div class="flex flex-col gap-3 mt-10">
+                    <button onclick="resetGame()" class="py-4 bg-sky-600 hover:bg-sky-500 px-12 rounded-2xl font-900 text-sm">CHƠI LẠI</button>
+                    <button onclick="backToMenu()" class="py-4 text-slate-500 font-bold text-xs uppercase hover:text-white">THOÁT</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let gridSize = 3, board = [], gameActive = false;
+        const HUMAN = "X", AI = "O";
+        let winTarget = 3;
+        let currentPlayer = HUMAN;
+
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        const menuEl = document.getElementById('menu');
+        const gameUIEl = document.getElementById('gameUI');
+        const modal = document.getElementById('modal');
+        const thinkingEl = document.getElementById('thinking');
+        const canvas = document.getElementById('confetti-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function updateSlider(v) {
+            document.getElementById('sliderValue').innerText = v;
+            document.getElementById('sliderValue2').innerText = v;
+        }
+
+        function handleCustomStart() {
+            startGame(parseInt(document.getElementById('sizeSlider').value));
+        }
+
+        function startGame(size) {
+            gridSize = size;
+            winTarget = size <= 4 ? 3 : 5;
+            board = Array(gridSize * gridSize).fill("");
+            menuEl.classList.add('hidden');
+            gameUIEl.classList.remove('hidden');
+            modal.classList.add('hidden');
+            document.getElementById('gameInfo').innerText = `GRID: ${size}x${size} | WIN: ${winTarget}`;
+            
+            // Random ai đi trước hay người đi trước
+            currentPlayer = Math.random() < 0.5 ? HUMAN : AI;
+            
+            initBoard();
+            gameActive = true;
+            
+            updateStatusUI();
+
+            if (currentPlayer === AI) {
+                handleAIMove();
+            }
+        }
+
+        function updateStatusUI() {
+            if (currentPlayer === HUMAN) {
+                statusEl.innerText = "ĐẾN LƯỢT BẠN (X)";
+                statusEl.className = "font-black text-sky-400 uppercase tracking-widest text-[11px] mb-1";
+            } else {
+                statusEl.innerText = "AI ĐANG TÍNH (O)";
+                statusEl.className = "font-black text-rose-400 uppercase tracking-widest text-[11px] mb-1";
+            }
+        }
+
+        function initBoard() {
+            boardEl.innerHTML = '';
+            boardEl.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+            const availableSpace = Math.min(window.innerWidth - 40, window.innerHeight - 300);
+            const cellSize = Math.floor(availableSpace / gridSize);
+            
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.style.width = `${cellSize}px`;
+                cell.style.height = `${cellSize}px`;
+                cell.style.fontSize = `${cellSize * 0.6}px`;
+                cell.onclick = () => handleHumanMove(i);
+                boardEl.appendChild(cell);
+            }
+        }
+
+        function handleHumanMove(idx) {
+            if (board[idx] !== "" || !gameActive || currentPlayer !== HUMAN) return;
+            applyMove(idx, HUMAN);
+            if (gameActive) {
+                currentPlayer = AI;
+                updateStatusUI();
+                handleAIMove();
+            }
+        }
+
+        function handleAIMove() {
+            thinkingEl.style.opacity = "1";
+            setTimeout(() => {
+                const aiMove = getBestMove();
+                applyMove(aiMove, AI);
+                thinkingEl.style.opacity = "0";
+                if (gameActive) {
+                    currentPlayer = HUMAN;
+                    updateStatusUI();
+                }
+            }, 600); // Tạo cảm giác AI đang suy nghĩ
+        }
+
+        function applyMove(idx, player) {
+            if (idx === -1) return;
+            board[idx] = player;
+            const cell = boardEl.children[idx];
+            cell.innerText = player;
+            cell.classList.add(player.toLowerCase());
+            
+            const winCells = checkWin(board, player);
+            if (winCells) endGame(player, winCells);
+            else if (board.every(c => c !== "")) endGame("tie");
+        }
+
+        // --- ULTRA AI LOGIC ---
+        function getBestMove() {
+            const depth = gridSize <= 3 ? 9 : (gridSize <= 5 ? 5 : 3);
+            let bestScore = -Infinity;
+            let move = -1;
+
+            let moves = getPotentialMoves(board);
+            moves.sort((a, b) => scoreIndividualMove(b, AI) - scoreIndividualMove(a, AI));
+
+            for (let m of moves) {
+                board[m] = AI;
+                let score = minimax(board, 0, false, -Infinity, Infinity, depth);
+                board[m] = "";
+                if (score > bestScore) {
+                    bestScore = score;
+                    move = m;
+                }
+            }
+            return move;
+        }
+
+        function minimax(b, d, isMax, alpha, beta, limit) {
+            const winner = checkWin(b, isMax ? HUMAN : AI);
+            if (winner) return isMax ? -10000 + d : 10000 - d;
+            if (b.every(c => c !== "") || d >= limit) return evaluateBoard(b);
+
+            const moves = getPotentialMoves(b);
+            if (isMax) {
+                let maxEval = -Infinity;
+                for (let m of moves) {
+                    b[m] = AI;
+                    let ev = minimax(b, d + 1, false, alpha, beta, limit);
+                    b[m] = "";
+                    maxEval = Math.max(maxEval, ev);
+                    alpha = Math.max(alpha, ev);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (let m of moves) {
+                    b[m] = HUMAN;
+                    let ev = minimax(b, d + 1, true, alpha, beta, limit);
+                    b[m] = "";
+                    minEval = Math.min(minEval, ev);
+                    beta = Math.min(beta, ev);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        function getPotentialMoves(b) {
+            let moves = [];
+            for (let i = 0; i < b.length; i++) {
+                if (b[i] === "") {
+                    if (hasNeighbor(i, b) || gridSize <= 3) moves.push(i);
+                }
+            }
+            if (moves.length === b.length) return [Math.floor(b.length / 2)];
+            return moves;
+        }
+
+        function hasNeighbor(idx, b) {
+            const r = Math.floor(idx / gridSize), c = idx % gridSize;
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    const nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize && b[nr * gridSize + nc] !== "") return true;
+                }
+            }
+            return false;
+        }
+
+        function scoreIndividualMove(idx, p) {
+            const r = Math.floor(idx / gridSize), c = idx % gridSize;
+            const center = (gridSize - 1) / 2;
+            const dist = Math.abs(r - center) + Math.abs(c - center);
+            return (gridSize - dist);
+        }
+
+        function evaluateBoard(b) {
+            let score = 0;
+            for (let i = 0; i < b.length; i++) {
+                if (b[i] === "") continue;
+                const player = b[i];
+                const multiplier = (player === AI ? 1 : -1);
+                score += multiplier * evaluateCell(i, b);
+            }
+            return score;
+        }
+
+        function evaluateCell(idx, b) {
+            const player = b[idx];
+            const r = Math.floor(idx / gridSize), c = idx % gridSize;
+            let cellScore = 0;
+            const directions = [[0,1],[1,0],[1,1],[1,-1]];
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                let openEnds = 0;
+                for (let s = 1; s < winTarget; s++) {
+                    const nr = r + dr*s, nc = c + dc*s;
+                    if (nr>=0 && nr<gridSize && nc>=0 && nc<gridSize) {
+                        if (b[nr*gridSize+nc] === player) count++;
+                        else { if (b[nr*gridSize+nc] === "") openEnds++; break; }
+                    } else break;
+                }
+                for (let s = 1; s < winTarget; s++) {
+                    const nr = r - dr*s, nc = c - dc*s;
+                    if (nr>=0 && nr<gridSize && nc>=0 && nc<gridSize) {
+                        if (b[nr*gridSize+nc] === player) count++;
+                        else { if (b[nr*gridSize+nc] === "") openEnds++; break; }
+                    } else break;
+                }
+                if (count >= winTarget) cellScore += 5000;
+                else if (count === winTarget - 1) {
+                    if (openEnds === 2) cellScore += 2000;
+                    else if (openEnds === 1) cellScore += 500;
+                }
+                else if (count === winTarget - 2) {
+                    if (openEnds === 2) cellScore += 200;
+                }
+            }
+            return cellScore;
+        }
+
+        function checkWin(b, p) {
+            for (let i = 0; i < b.length; i++) {
+                if (b[i] !== p) continue;
+                const r = Math.floor(i / gridSize), c = i % gridSize;
+                for (let [dr, dc] of [[0,1],[1,0],[1,1],[1,-1]]) {
+                    let cells = [i];
+                    for (let s = 1; s < winTarget; s++) {
+                        const nr = r + dr*s, nc = c + dc*s;
+                        if (nr>=0 && nr<gridSize && nc>=0 && nc<gridSize && b[nr*gridSize+nc] === p) cells.push(nr*gridSize+nc);
+                        else break;
+                    }
+                    if (cells.length === winTarget) return cells;
+                }
+            }
+            return null;
+        }
+
+        function endGame(winner, cells) {
+            gameActive = false;
+            if (cells) cells.forEach(i => boardEl.children[i].classList.add('winning-cell'));
+            setTimeout(() => {
+                modal.classList.remove('hidden');
+                const text = document.getElementById('modalText');
+                const icon = document.getElementById('resultIcon');
+                if (winner === HUMAN) {
+                    icon.innerText = "🏆";
+                    text.innerText = "BẠN THẮNG!";
+                    text.style.color = "#38bdf8";
+                    startConfetti();
+                } else if (winner === AI) {
+                    icon.innerText = "💀";
+                    text.innerText = "AI THẮNG!";
+                    text.style.color = "#fb7185";
+                } else {
+                    icon.innerText = "🤝";
+                    text.innerText = "HÒA NHAU";
+                    text.style.color = "#94a3b8";
+                }
+            }, 600);
+        }
+
+        function backToMenu() {
+            gameUIEl.classList.add('hidden');
+            menuEl.classList.remove('hidden');
+            modal.classList.add('hidden');
+            stopConfetti();
+        }
+
+        function resetGame() {
+            modal.classList.add('hidden');
+            stopConfetti();
+            startGame(gridSize);
+        }
+
+        let confetti = [], confettiActive = false;
+        function startConfetti() {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            confetti = Array.from({length:100}, () => ({
+                x: Math.random()*canvas.width, y: Math.random()*canvas.height - canvas.height,
+                r: Math.random()*6+2, d: Math.random()*10, color: `hsl(${Math.random()*360},70%,60%)`, tilt: Math.random()*10-10
+            }));
+            confettiActive = true; drawConfetti();
+        }
+        function drawConfetti() {
+            if(!confettiActive) return; ctx.clearRect(0,0,canvas.width,canvas.height);
+            confetti.forEach(p => {
+                ctx.beginPath(); ctx.lineWidth = p.r; ctx.strokeStyle = p.color;
+                ctx.moveTo(p.x+p.tilt+p.r/2, p.y); ctx.lineTo(p.x+p.tilt, p.y+p.tilt+p.r/2); ctx.stroke();
+                p.y += (Math.cos(p.d)+1+p.r/2)/2; p.x += Math.sin(p.d);
+                if(p.y > canvas.height) p.y = -20;
+            });
+            requestAnimationFrame(drawConfetti);
+        }
+        function stopConfetti() { confettiActive = false; ctx.clearRect(0,0,canvas.width,canvas.height); }
+    </script>
+</body>
+</html>
